@@ -8,36 +8,91 @@
 #include <linux/compiler.h>
 #include <i2c.h>
 
+#ifndef CONFIG_SYS_BOOTCOUNT_I2C_ADDR
+/* compatibility with the previous logic:
+ * previous version of driver used RTC device to store bootcount
+ */
+#define CONFIG_SYS_BOOTCOUNT_I2C_ADDR CONFIG_SYS_I2C_RTC_ADDR
+#endif
+
 #define BC_MAGIC	0xbc
+
+#ifdef CONFIG_SYS_BOOTCOUNT_I2C_BUS
+static int bootcount_set_bus(void)
+{
+	unsigned int current_bus = i2c_get_bus_num();
+
+	assert(current_bus <= INT_MAX);
+
+	int res = i2c_set_bus_num(CONFIG_SYS_BOOTCOUNT_I2C_BUS);
+
+	if (res < 0) {
+		puts("Error switching I2C bus\n");
+		return res;
+	}
+	return (int)current_bus;
+}
+
+static void bootcount_set_bus_back(int prev_bus)
+{
+	if (i2c_set_bus_num(prev_bus) < 0)
+		puts("Can't switch I2C bus back\n");
+}
+#else
+static inline void bootcount_set_bus(void) { return ; }
+
+static inline int bootcount_set_bus_back(int prev_bus __attribute__((unused)))
+{
+	return 0;
+}
+#endif
 
 void bootcount_store(ulong a)
 {
+	int prev_i2c_bus = bootcount_set_bus();
+
+	if (prev_i2c_bus < 0)
+		return;
+
 	unsigned char buf[3];
 	int ret;
 
 	buf[0] = BC_MAGIC;
 	buf[1] = (a & 0xff);
-	ret = i2c_write(CONFIG_SYS_I2C_RTC_ADDR, CONFIG_SYS_BOOTCOUNT_ADDR,
-		  CONFIG_BOOTCOUNT_ALEN, buf, 2);
+	ret = i2c_write(CONFIG_SYS_BOOTCOUNT_I2C_ADDR,
+			CONFIG_SYS_BOOTCOUNT_ADDR,
+			CONFIG_BOOTCOUNT_ALEN, buf, 2);
 	if (ret != 0)
 		puts("Error writing bootcount\n");
+
+	bootcount_set_bus_back(prev_i2c_bus);
 }
 
 ulong bootcount_load(void)
 {
+	ulong count = 0;
+
+	int prev_i2c_bus = bootcount_set_bus();
+
+	if (prev_i2c_bus < 0)
+		return count;
+
 	unsigned char buf[3];
 	int ret;
 
-	ret = i2c_read(CONFIG_SYS_I2C_RTC_ADDR, CONFIG_SYS_BOOTCOUNT_ADDR,
+	ret = i2c_read(CONFIG_SYS_BOOTCOUNT_I2C_ADDR,
+		       CONFIG_SYS_BOOTCOUNT_ADDR,
 		       CONFIG_BOOTCOUNT_ALEN, buf, 2);
 	if (ret != 0) {
 		puts("Error loading bootcount\n");
-		return 0;
+		goto out;
 	}
 	if (buf[0] == BC_MAGIC)
-		return buf[1];
+		count = buf[1];
+	else
+		bootcount_store(count);
 
-	bootcount_store(0);
-
-	return 0;
+out:
+	bootcount_set_bus_back(prev_i2c_bus);
+	return count;
 }
