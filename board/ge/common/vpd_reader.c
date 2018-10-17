@@ -5,6 +5,7 @@
 
 #include "vpd_reader.h"
 
+#include <linux/bug.h>
 #include <i2c.h>
 #include <linux/bch.h>
 #include <stdlib.h>
@@ -200,7 +201,26 @@ int read_vpd(struct vpd_cache *cache,
 	     int (*process_block)(struct vpd_cache *, u8 id, u8 version,
 				  u8 type, size_t size, u8 const *data))
 {
+#if defined(CONFIG_BOOTCOUNT_I2C) &&					\
+	(CONFIG_SYS_BOOTCOUNT_I2C_BUS == CONFIG_SYS_VPD_EEPROM_I2C_BUS) && \
+	((CONFIG_SYS_BOOTCOUNT_I2C_ADDR & 0xf0) == CONFIG_SYS_VPD_EEPROM_I2C_ADDR)
+	/*
+	 * bootcount is expected to reside at the end of EEPROM
+	 *
+	 * check is hard-wired to the logic of the 24C08 EEPROM 256-bytes
+	 * page-wise (4 pages) i2c_address/bootcount_address structure combined
+	 * with raw I2C access, so the I2C address and offset are combined into:
+	 *
+	 *     i2c_addr = (device_i2c_addr | page),
+	 *     offset = (offset - (page * 256)))
+	 */
+	BUILD_BUG_ON((CONFIG_SYS_BOOTCOUNT_I2C_ADDR & 0x0f) * 256 +
+		     CONFIG_SYS_BOOTCOUNT_ADDR + CONFIG_BOOTCOUNT_I2C_LEN !=
+		     CONFIG_SYS_VPD_EEPROM_SIZE);
+	static const size_t size = CONFIG_SYS_BOOTCOUNT_ADDR;
+#else
 	static const size_t size = CONFIG_SYS_VPD_EEPROM_SIZE;
+#endif
 
 	int res;
 	u8 *data;

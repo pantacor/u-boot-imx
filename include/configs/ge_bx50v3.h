@@ -112,9 +112,9 @@
 		"setenv stdout vga; " \
 		"echo \"\n\n\n\n    \" $msg; " \
 		"setenv stdout serial; " \
-		"mw.b 0x7000A000 0xbc; " \
-		"mw.b 0x7000A001 0x00; " \
-		"ext4write ${dev} ${devnum}:5 0x7000A000 /boot/failures 2\0" \
+		"i2c dev 4; " \
+		"i2c mw.b 53 fe bc; " \
+		"i2c mw.b 53 ff 00; \0" \
 	"altbootcmd=" \
 		"run doquiet; " \
 		"setenv partnum 1; run hasfirstboot || setenv partnum 2; " \
