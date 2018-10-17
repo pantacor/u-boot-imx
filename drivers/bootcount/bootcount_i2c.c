@@ -54,14 +54,15 @@ void bootcount_store(ulong a)
 	if (prev_i2c_bus < 0)
 		return;
 
-	unsigned char buf[3];
+	unsigned char buf[2];
 	int ret;
 
+	BUILD_BUG_ON(sizeof(buf) > CONFIG_BOOTCOUNT_I2C_LEN);
 	buf[0] = BC_MAGIC;
 	buf[1] = (a & 0xff);
 	ret = i2c_write(CONFIG_SYS_BOOTCOUNT_I2C_ADDR,
 			CONFIG_SYS_BOOTCOUNT_ADDR,
-			CONFIG_BOOTCOUNT_ALEN, buf, 2);
+			CONFIG_BOOTCOUNT_ALEN, buf, sizeof(buf));
 	if (ret != 0)
 		puts("Error writing bootcount\n");
 
@@ -77,12 +78,13 @@ ulong bootcount_load(void)
 	if (prev_i2c_bus < 0)
 		return count;
 
-	unsigned char buf[3];
+	unsigned char buf[2];
 	int ret;
 
+	BUILD_BUG_ON(sizeof(buf) > CONFIG_BOOTCOUNT_I2C_LEN);
 	ret = i2c_read(CONFIG_SYS_BOOTCOUNT_I2C_ADDR,
 		       CONFIG_SYS_BOOTCOUNT_ADDR,
-		       CONFIG_BOOTCOUNT_ALEN, buf, 2);
+		       CONFIG_BOOTCOUNT_ALEN, buf, sizeof(buf));
 	if (ret != 0) {
 		puts("Error loading bootcount\n");
 		goto out;

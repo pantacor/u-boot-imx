@@ -174,4 +174,10 @@ config SYS_BOOTCOUNT_I2C_ADDR
 	depends on BOOTCOUNT_I2C
 	help
 	  I2C address of the device used to store bootcounter
+
+config BOOTCOUNT_I2C_LEN
+	int "Maximum length of bootcounter in bytes"
+	default 2
+	depends on BOOTCOUNT_I2C
+
 endif
